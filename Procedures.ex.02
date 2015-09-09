@@ -1,0 +1,80 @@
+--SELECT * FROM relatoriovendas('01.01.2014','04.09.2015');
+
+
+ALTER procedure relatorioVendas(DATAINICIAL DATE, DATAFINAL DATE)
+returns(
+COLUNA1 VARCHAR(100),
+COLUNA2 NUMERIC(18,2),
+COLUNA3 NUMERIC(5,2))
+as
+declare variable SOMATOTAL NUMERIC(18,2);
+declare variable SOMACLIENTE NUMERIC(18,2);
+declare variable PORCCLIENTE NUMERIC(5,2);
+declare variable CLICOD INTEGER;
+declare variable clinome varchar(60);
+begin
+
+    SELECT SUM(coalesce(ped_vl_liquido,0)) FROM PEDIDO where ped_data BETWEEN :DATAINICIAL AND :DATAFINAL INTO :SOMATOTAL;
+
+    COLUNA1 = 'Relatorio de vendas com participaCOes';
+    COLUNA2 = NULL;
+    COLUNA3 = NULL;
+    SUSPEND;
+
+
+    FOR SELECT
+                A.ped_cliente,
+                i.cli_nome,
+                SUM(A.ped_vl_liquido),
+                (sum(coalesce(a.ped_vl_liquido,0))/:somatotal)*100
+    FROM PEDIDO A
+    inner join cliente i on i.cli_codigo = a.ped_cliente
+    WHERE (A.ped_data BETWEEN :DATAINICIAL AND :DATAFINAL)
+    GROUP BY 1,2
+
+    INTO:CLICOD,:clinome,  :SOMACLIENTE, :PORCCLIENTE
+
+    DO
+    BEGIN
+        COLUNA1 = :CLINOME;
+
+        COLUNA2 = NULL;
+        COLUNA3 = NULL;
+        SUSPEND;
+
+        FOR SELECT
+        CASE EXTRACT(MONTH FROM B.ped_data)
+            WHEN 1 THEN '     JANEIRO'
+            WHEN 2 THEN '     FEVEREIRO'
+            WHEN 3 THEN '     MARCO'
+            WHEN 4 THEN '     ABRIL'
+            WHEN 5 THEN '     MAIO'
+            WHEN 6 THEN '     JUNHO'
+            WHEN 7 THEN '     JULHO'
+            WHEN 8 THEN '     AGOSTO'
+            WHEN 9 THEN '     SETEMBRO'
+            WHEN 10 THEN '     OUTUBRO'
+            WHEN 11 THEN '     NOVEMBRO'
+            WHEN 12 THEN '     DEZEMBRO'
+         END,
+        SUM(B.ped_vl_liquido),NULL from PEDIDO B
+        WHERE B.ped_cliente = :CLICOD AND B.ped_data BETWEEN :DATAINICIAL AND :DATAFINAL
+        GROUP BY 1
+        INTO :COLUNA1,:COLUNA2,:coluna3
+
+        DO SUSPEND;
+
+
+        COLUNA1 = 'TOTAL';
+        COLUNA2 = :SOMACLIENTE;
+        COLUNA3 = :porccliente;
+        SUSPEND;
+
+    END
+
+    COLUNA1 = 'TOTAL GERAL DO RELATORIO';
+
+    COLUNA2 = :SOMATOTAL;
+    SUSPEND;
+end;
+
